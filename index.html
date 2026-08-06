@@ -543,10 +543,12 @@
     <!-- 신규입력 -->
     <div class="panel active" id="panel-new">
       <div class="card">
+        <div class="hint">지도에서 <b>주황색 아이콘을 드래그</b>하거나 <b>지도를 클릭</b>하면 아래 위도/경도 칸에 자동으로 채워집니다. 물론 위도/경도를 직접 타이핑해도 되고, 그러면 지도 위 아이콘도 그 자리로 같이 옮겨갑니다.</div>
+        <div id="newMapPicker" style="width:100%;height:260px;border-radius:12px;border:1px solid var(--line);margin-bottom:12px;"></div>
         <div class="msg" id="newMsg"></div>
         <div class="row">
-          <div><label>위도 (예: 37.7912)</label><input type="text" id="newLat" placeholder="37.xxxxxx"></div>
-          <div><label>경도 (예: 128.9229)</label><input type="text" id="newLng" placeholder="128.xxxxxx"></div>
+          <div><label>위도 (예: 37.7912)</label><input type="text" id="newLat" placeholder="37.xxxxxx" oninput="onNewLatLngTyped()"></div>
+          <div><label>경도 (예: 128.9229)</label><input type="text" id="newLng" placeholder="128.xxxxxx" oninput="onNewLatLngTyped()"></div>
         </div>
         <div class="row"><div><label>주소 / 위치 설명</label><input type="text" id="newAddr" placeholder="강릉시 강동면 안인진리 159-60"></div></div>
         <div class="row"><div><label>비고 (선택)</label><input type="text" id="newNote" placeholder="방파제(TTP) 등"></div></div>
@@ -766,6 +768,45 @@ async function initMap(){
   geocoder = new kakao.maps.services.Geocoder();
   populateRegionSelect();
   classifyMissingRegions();       // 아직 행정구역이 안 붙은 좌표만 백그라운드로 분류(최초 1회, 이후 캐시됨)
+
+  // 처음엔 내 GPS 위치를 중심으로 — 이후엔 지도를 강제로 다시 옮기지 않음(사용자가 팬/줌하면 그대로 둠)
+  centerMapOnMyLocationOnce();
+  startMyLocationTracking();
+
+  // AED를 켜둔 상태에서 지도를 움직이거나 확대/축소하면, 멈췄을 때(idle) 그 위치 기준으로 다시 조회
+  kakao.maps.event.addListener(map, 'idle', ()=>{ if(aedState.on) loadAedForCurrentRegion(); });
+}
+
+function centerMapOnMyLocationOnce(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{ map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude)); },
+    (err)=>{ console.warn('초기 위치 가져오기 실패(기본 강릉 중심 유지):', err.message); },
+    { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
+  );
+}
+
+// 내 위치를 파란 점으로 표시하고 이동에 따라 계속 갱신 — 지도 중심은 절대 다시 옮기지 않음(사용자 조작 우선)
+let myLocationMarker = null, myLocationWatchId = null;
+function startMyLocationTracking(){
+  if(!navigator.geolocation) return;
+  const dotIcon = new kakao.maps.MarkerImage(
+    'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="9" fill="#1E90FF" stroke="#fff" stroke-width="3"/></svg>`
+    ), new kakao.maps.Size(22,22), { offset: new kakao.maps.Point(11,11) }
+  );
+  myLocationWatchId = navigator.geolocation.watchPosition(
+    (pos)=>{
+      const p = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+      if(!myLocationMarker){
+        myLocationMarker = new kakao.maps.Marker({ position:p, map, image:dotIcon, zIndex:30 });
+      } else {
+        myLocationMarker.setPosition(p); // 위치만 갱신, 지도는 안 움직임(팬/줌 유지)
+      }
+    },
+    (err)=>{ console.warn('위치 추적 실패:', err.message); },
+    { enableHighAccuracy:true, maximumAge:5000, timeout:10000 }
+  );
 }
 
 function renderAllMarkers(){
@@ -846,6 +887,9 @@ function onRegionChange(){
 // 절대 URLSearchParams 등에 넣어 다시 인코딩하지 말고, 아래처럼 URL 문자열에 그대로 붙여야 합니다.
 const AED_SERVICE_KEY_ENCODED = 'TUbUhIiFWVRorR5hyktEuzY05oGV0Wd%2FTohPPdjOB27lUHRN521Oc6cJD%2BityxwoJzleTCzC%2BBYOroBVoyOxhA%3D%3D';
 const AED_API_URL = 'https://apis.data.go.kr/B552657/AEDInfoInqireService/getEgytAedManageInfoInqire';
+// CORS 때문에 브라우저에서 직접 호출이 막히면, 아래에 Cloudflare Worker 프록시 주소를 넣고 켜세요.
+// 예: const AED_PROXY_PREFIX = 'https://aed-proxy.내계정.workers.dev/?url=';
+const AED_PROXY_PREFIX = ''; // 비워두면 직접 호출, 값 넣으면 그 앞에 붙여서 프록시로 우회
 
 let aedState = { on:false, markers:[] };
 
@@ -866,12 +910,19 @@ function clearAedMarkers(){
 }
 
 async function loadAedForCurrentRegion(){
-  if(!map) return;
+  const box = document.getElementById('aedInfoBox');
+  if(!map){
+    box.classList.add('show');
+    box.innerHTML = '⚠️ 지도가 아직 준비되지 않았습니다. 화면 위쪽에 지도 로딩 에러 배너가 떠 있는지 확인해주세요 (카카오 앱키/도메인 등록 문제일 수 있어요).';
+    return;
+  }
+  box.classList.add('show');
+  box.innerHTML = '📡 이 지역 AED 정보를 불러오는 중…';
   // 지도 중심 좌표를 카카오 좌표→행정구역 API로 시도/시군구 이름을 얻어서 AED 조회에 사용
   const center = map.getCenter();
   const regionName = await coord2RegionName(center.getLat(), center.getLng());
   if(!regionName || regionName==='기타'){
-    alert('현재 지도 위치의 행정구역을 확인하지 못했습니다. 지도를 조금 이동한 뒤 다시 시도해주세요.');
+    box.innerHTML = '⚠️ 현재 지도 위치의 행정구역을 확인하지 못했습니다. 지도를 조금 이동한 뒤 다시 시도해주세요.';
     return;
   }
   const [sido, sigungu] = regionName.split(' ');
@@ -882,9 +933,10 @@ async function fetchAed(sido, sigungu){
   clearAedMarkers();
   try{
     // serviceKey는 이미 인코딩돼 있으므로 문자열로 직접 붙이고, 나머지 값만 encodeURIComponent 처리
-    const url = `${AED_API_URL}?serviceKey=${AED_SERVICE_KEY_ENCODED}`
+    const targetUrl = `${AED_API_URL}?serviceKey=${AED_SERVICE_KEY_ENCODED}`
       + `&Q0=${encodeURIComponent(sido)}&Q1=${encodeURIComponent(sigungu)}`
       + `&pageNo=1&numOfRows=100`;
+    const url = AED_PROXY_PREFIX ? (AED_PROXY_PREFIX + encodeURIComponent(targetUrl)) : targetUrl;
     const res = await fetch(url);
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
@@ -961,11 +1013,21 @@ const AED_ICON = () => new kakao.maps.MarkerImage(
     `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect x="3" y="3" width="24" height="24" rx="6" fill="#E4572E" stroke="#fff" stroke-width="2"/><path d="M15 8v14M8 15h14" stroke="#fff" stroke-width="3"/></svg>`
   ), new kakao.maps.Size(30,30), { offset: new kakao.maps.Point(15,15) }
 );
+// 지금 운영시간이 아닌 AED는 흑백(회색)으로 표시 — 가서 못 쓰는 걸 미리 알 수 있게
+const AED_ICON_GRAY = () => new kakao.maps.MarkerImage(
+  'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><rect x="3" y="3" width="24" height="24" rx="6" fill="#9AA5AC" stroke="#fff" stroke-width="2"/><path d="M15 8v14M8 15h14" stroke="#fff" stroke-width="3"/></svg>`
+  ), new kakao.maps.Size(30,30), { offset: new kakao.maps.Point(15,15) }
+);
 
 function renderAedMarker(a){
   const pos = avoidOverlapPosition(a.lat, a.lng);
+  // 운영시간 정보가 있고, 지금이 그 시간대가 아니면(available===false) 흑백 아이콘.
+  // 운영시간 정보가 아예 없으면(available===null) 굳이 막지 말고 활성(컬러) 상태로 표시.
+  const status = isAedAvailableNow(a);
+  const icon = (status.available === false) ? AED_ICON_GRAY() : AED_ICON();
   const marker = new kakao.maps.Marker({
-    position: new kakao.maps.LatLng(pos.lat, pos.lng), map, image: AED_ICON(), zIndex: 15
+    position: new kakao.maps.LatLng(pos.lat, pos.lng), map, image: icon, zIndex: 15
   });
   kakao.maps.event.addListener(marker, 'click', ()=>showAedInfo(a));
   aedState.markers.push(marker);
@@ -1604,6 +1666,7 @@ function closeAdminDash(){ document.getElementById('adminDash').classList.remove
 function openAdminDash(){
   document.getElementById('adminDash').classList.add('show');
   refreshRequestBadge();
+  initNewMapPicker(); // 기본 활성 탭이 신규입력이라 여기서 바로 지도 초기화
   // 대량수정 표(3천여 건)는 그 탭을 실제로 열 때만 그림 — 진입 시엔 렌더링 안 함(성능)
 }
 
@@ -1614,6 +1677,52 @@ function switchTab(name){
   if(name==='bulkEdit') buildBulkEditTable();
   if(name==='requests') renderRequestsList();
   if(name==='history') renderHistoryList();
+  if(name==='new') initNewMapPicker();
+}
+
+/* ---------------- 신규입력 지도 피커 (직접입력과 병행) ---------------- */
+let newMapPicker = null, newPickMarker = null;
+const NEW_PICK_ICON = () => new kakao.maps.MarkerImage(
+  'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><circle cx="15" cy="15" r="12" fill="#FF6B35" stroke="#fff" stroke-width="3"/></svg>`
+  ), new kakao.maps.Size(30,30), { offset: new kakao.maps.Point(15,15) }
+);
+
+function initNewMapPicker(){
+  const container = document.getElementById('newMapPicker');
+  if(!container || !window.kakao || !kakao.maps) return;
+  if(newMapPicker){
+    setTimeout(()=>newMapPicker.relayout(), 0); // 탭 전환 직후 컨테이너 크기 재계산
+    return;
+  }
+  const center = (map ? map.getCenter() : new kakao.maps.LatLng(37.78, 128.95));
+  newMapPicker = new kakao.maps.Map(container, { center, level: 6 });
+  newPickMarker = new kakao.maps.Marker({ position: center, map: newMapPicker, draggable: true, image: NEW_PICK_ICON() });
+
+  kakao.maps.event.addListener(newPickMarker, 'dragend', ()=>{
+    const p = newPickMarker.getPosition();
+    setNewLatLngFields(p.getLat(), p.getLng());
+  });
+  kakao.maps.event.addListener(newMapPicker, 'click', (mouseEvent)=>{
+    newPickMarker.setPosition(mouseEvent.latLng);
+    setNewLatLngFields(mouseEvent.latLng.getLat(), mouseEvent.latLng.getLng());
+  });
+}
+
+function setNewLatLngFields(lat, lng){
+  document.getElementById('newLat').value = lat.toFixed(6);
+  document.getElementById('newLng').value = lng.toFixed(6);
+}
+
+// 위도/경도를 직접 타이핑했을 때도 지도 위 아이콘이 같이 따라 움직이게(병행 동작)
+function onNewLatLngTyped(){
+  if(!newMapPicker || !newPickMarker) return;
+  const lat = parseFloat(document.getElementById('newLat').value);
+  const lng = parseFloat(document.getElementById('newLng').value);
+  if(isNaN(lat) || isNaN(lng)) return;
+  const pos = new kakao.maps.LatLng(lat, lng);
+  newPickMarker.setPosition(pos);
+  newMapPicker.setCenter(pos);
 }
 
 /* ---------------- 수정요청 확인(관리자) ---------------- */
