@@ -85,10 +85,17 @@
     padding:11px 16px;font-size:13px;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.22);
     cursor:pointer;
   }
-  #eduEntry{
+  #myLocationEntry{
     position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top));z-index:500;
     width:40px;height:40px;border-radius:50%;background:var(--navy);color:#fff;
-    border:2px solid #fff;font-size:18px;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;
+    border:2px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  #eduEntry{
+    position:fixed;right:62px;bottom:22px;z-index:500;
+    width:38px;height:38px;border-radius:50%;background:var(--danger);color:#fff;
+    border:2px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
   }
   #classifyProgress{
     display:none;position:fixed;top:calc(58px + env(safe-area-inset-top));left:14px;z-index:499;
@@ -268,9 +275,15 @@
 <div id="classifyProgress"></div>
 <div id="aedInfoBox"></div>
 
-<button id="eduEntry" onclick="openEduPanel()" title="안전교육">📖</button>
+<button id="myLocationEntry" onclick="goToMyLocation()" title="내 위치로 가기">
+  <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="3" fill="#fff"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="2"/></svg>
+</button>
 
 <!-- 우측 하단 관리자 진입 아이콘 -->
+<button id="eduEntry" onclick="openEduPanel()" title="안전교육">
+  <svg viewBox="0 0 24 24" width="20" height="20"><path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z" fill="#fff"/></svg>
+</button>
+
 <div id="adminEntry" title="관리자 모드">
   <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
 </div>
@@ -375,7 +388,7 @@
 
     <!-- 심폐소생술 -->
     <div class="edu-section active" id="edu-cpr">
-      <button id="metroBtn" onclick="toggleMetronome()">🔊 압박 속도 메트로놈 재생 (분당 110회)</button>
+      <button id="metroBtn" onclick="toggleMetronome()">🔊 압박 속도 메트로놈 재생 (분당 100회)</button>
 
       <div class="step-card">
         <div class="step-num">1</div>
@@ -391,13 +404,13 @@
 
       <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="20" y="16" width="24" height="30" rx="6" fill="none" stroke="#0FA3B1" stroke-width="3"/><path d="M20 28 Q26 22 32 28 T44 28" stroke="#0FA3B1" stroke-width="2.5" fill="none"/></svg></div>
+        <div class="step-icon"><svg viewBox="0 0 64 64"><ellipse cx="32" cy="40" rx="15" ry="19" fill="none" stroke="#0FA3B1" stroke-width="3"/><circle cx="32" cy="14" r="8" fill="none" stroke="#0FA3B1" stroke-width="3"/><path d="M22 32 Q26 27 30 32 T38 32 T46 32" stroke="#0FA3B1" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M20 40 Q26 36 32 40 T44 40" stroke="#0FA3B1" stroke-width="2.2" fill="none" opacity=".55" stroke-linecap="round"/></svg></div>
         <div class="step-text"><div class="step-title">호흡 확인 (구급상황요원과 함께)</div><div class="step-desc">숨을 쉬는지, 정상 호흡인지 확인합니다. 숨을 안 쉬거나, 헐떡이는 비정상 호흡(심장정지 호흡)이면 심장정지로 판단하고 즉시 가슴압박을 시작합니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">4</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="14" y="14" width="36" height="40" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><ellipse cx="32" cy="40" rx="8" ry="5" fill="#FF6B35"/><line x1="32" y1="14" x2="32" y2="54" stroke="#0B3454" stroke-width="1" stroke-dasharray="2,2"/></svg></div>
+        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="16" y="10" width="32" height="44" rx="14" fill="none" stroke="#0B3454" stroke-width="3"/><ellipse cx="32" cy="41" rx="12" ry="6" fill="#FF6B35"/><ellipse cx="32" cy="37" rx="9" ry="5" fill="none" stroke="#fff" stroke-width="1.8"/><path d="M32 15v16" stroke="#E4572E" stroke-width="3" stroke-linecap="round"/><path d="M25 24l7 9 7-9" stroke="#E4572E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <div class="step-text"><div class="step-title">가슴압박 — 위치와 자세</div><div class="step-desc"><b>복장뼈(가슴뼈) 아래쪽 절반</b> 지점에 한 손 손꿈치를 대고, 다른 손을 그 위에 겹쳐 깍지를 낍니다. 팔꿈치를 곧게 펴고 체중을 실어 수직으로 압박합니다. 주로 쓰는 손이 아래로 가는 것이 좋습니다.</div></div>
       </div>
 
@@ -409,7 +422,7 @@
 
       <div class="step-card">
         <div class="step-num">6</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="24" cy="24" r="10" fill="none" stroke="#0B3454" stroke-width="3"/><path d="M34 22c8 0 14 4 14 4" stroke="#0FA3B1" stroke-width="3" fill="none" stroke-linecap="round"/><text x="8" y="50" font-size="11" fill="#0B3454">30:2</text></svg></div>
+        <div class="step-icon"><svg viewBox="0 0 64 64"><path d="M16,30 C16,16 27,8 34,8 C42,8 45,14 44,20 C48,20 47,25 43,25 C42,29 38,30 36,29 C36,34 32,36 28,35 C26,42 20,46 16,46 Z" fill="none" stroke="#0B3454" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/><circle cx="34" cy="17" r="1.7" fill="#0B3454"/><path d="M44 20 Q53 16 59 20" stroke="#0FA3B1" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M53 15l6 5-6 3" stroke="#0FA3B1" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <div class="step-text"><div class="step-title">인공호흡 (교육받았고 할 수 있으면)</div><div class="step-desc">가슴압박 30회 : 인공호흡 2회 비율로 반복합니다. 머리를 뒤로 젖히고 턱을 들어 기도를 연 뒤, 1초간 가슴이 올라올 정도로 불어넣습니다. <b>인공호흡을 못하거나 꺼려지면 압박만 계속</b>해도 괜찮습니다(가슴압박소생술) — 아무것도 안 하는 것보다 훨씬 낫습니다.</div></div>
       </div>
 
@@ -498,12 +511,12 @@
       </div>
       <div class="step-card">
         <div class="step-num">2</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="18" y="8" width="28" height="40" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><rect x="21" y="14" width="9" height="7" fill="#FF6B35"/><rect x="34" y="30" width="9" height="7" fill="#FF6B35"/></svg></div>
+        <div class="step-icon"><svg viewBox="0 0 64 64"><path d="M24 8 Q32 4 40 8 L44 16 Q46 30 42 46 Q32 52 22 46 Q18 30 20 16 Z" fill="none" stroke="#0B3454" stroke-width="3" stroke-linejoin="round"/><rect x="33" y="14" width="9" height="7" rx="1.5" fill="#FF6B35"/><rect x="21" y="30" width="9" height="7" rx="1.5" fill="#FF6B35"/></svg></div>
         <div class="step-text"><div class="step-title">패드 부착 (맨 가슴에)</div><div class="step-desc">상의를 벗기고 패드 포장지 그림대로 <b>오른쪽 빗장뼈 아래</b>와 <b>왼쪽 젖꼭지 아래 옆구리 쪽</b>에 단단히 붙입니다. <b>여성도 브래지어를 벗길 필요 없이</b> 위치만 조정해 가슴 조직을 피해 부착하면 됩니다(2025년 지침).</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="16" y="12" width="32" height="40" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><line x1="20" y1="20" x2="44" y2="44" stroke="#E4572E" stroke-width="3"/><line x1="44" y1="20" x2="20" y2="44" stroke="#E4572E" stroke-width="3"/></svg></div>
+        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="30" cy="30" r="20" fill="none" stroke="#0B3454" stroke-width="3"/><path d="M18 40 Q30 30 42 40" stroke="#E4572E" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M14 14l32 32" stroke="#E4572E" stroke-width="3.5" stroke-linecap="round"/></svg></div>
         <div class="step-text"><div class="step-title">심전도 분석 중 — 접촉 금지</div><div class="step-desc">"분석 중입니다"라는 안내가 나오면 아무도 환자 몸에 닿지 않아야 합니다. 환자가 움직이지 않게 합니다.</div></div>
       </div>
       <div class="step-card">
@@ -777,10 +790,26 @@ async function initMap(){
   kakao.maps.event.addListener(map, 'idle', ()=>{ if(aedState.on) loadAedForCurrentRegion(); });
 }
 
+// 우측 상단 버튼으로 언제든 다시 내 위치로 이동(한 번만, 강제 추적 아님)
+function goToMyLocation(){
+  if(!navigator.geolocation){ alert('이 기기에서 위치 기능을 지원하지 않습니다.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+      map.setLevel(4);
+    },
+    (err)=>{ alert('위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.'); },
+    { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
+  );
+}
+
 function centerMapOnMyLocationOnce(){
   if(!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    (pos)=>{ map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude)); },
+    (pos)=>{
+      map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+      map.setLevel(4); // 도로가 보일 정도로 가깝게 (기본 9는 해안 전체가 보이는 넓은 축척)
+    },
     (err)=>{ console.warn('초기 위치 가져오기 실패(기본 강릉 중심 유지):', err.message); },
     { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
   );
@@ -1471,9 +1500,9 @@ function switchEdu(name){
   if(name!=='cpr') stopMetronome();
 }
 
-// 압박 속도 메트로놈 — 분당 110회(2025 가이드라인 100~120회 권장 구간의 중간값), 순수 합성음(Web Audio API)
+// 압박 속도 메트로놈 — 분당 100회(2025 가이드라인 100~120회 권장 구간의 하한값), 순수 합성음(Web Audio API)
 let metroCtx = null, metroTimer = null, metroOn = false;
-const METRO_BPM = 110;
+const METRO_BPM = 100;
 
 function toggleMetronome(){
   if(metroOn) stopMetronome(); else startMetronome();
@@ -1481,7 +1510,7 @@ function toggleMetronome(){
 function startMetronome(){
   if(!metroCtx) metroCtx = new (window.AudioContext || window.webkitAudioContext)();
   metroOn = true;
-  document.getElementById('metroBtn').textContent = '⏹ 정지 (재생 중 · 분당 110회)';
+  document.getElementById('metroBtn').textContent = '⏹ 정지 (재생 중 · 분당 100회)';
   document.getElementById('metroBtn').classList.add('playing');
   const intervalMs = 60000 / METRO_BPM;
   const beep = ()=>{
@@ -1501,7 +1530,7 @@ function stopMetronome(){
   metroOn = false;
   if(metroTimer) clearInterval(metroTimer);
   const btn = document.getElementById('metroBtn');
-  if(btn){ btn.textContent = '🔊 압박 속도 메트로놈 재생 (분당 110회)'; btn.classList.remove('playing'); }
+  if(btn){ btn.textContent = '🔊 압박 속도 메트로놈 재생 (분당 100회)'; btn.classList.remove('playing'); }
 }
 
 function openDirections(){
