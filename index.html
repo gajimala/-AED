@@ -12,6 +12,22 @@
 -->
 <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=d02572eca2dd38bbbbb6692254d51bb7&autoload=false&libraries=services,clusterer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBKyF46dlvgE5mG3VLhCHto4fdCpSYXETA",
+    authDomain: "ls-aed-6b2c5.firebaseapp.com",
+    projectId: "ls-aed-6b2c5",
+    storageBucket: "ls-aed-6b2c5.firebasestorage.app",
+    messagingSenderId: "535805485726",
+    appId: "1:535805485726:web:4c99c18634a96a78a2518f"
+  };
+  try{
+    if(typeof firebase !== 'undefined') firebase.initializeApp(firebaseConfig);
+    else console.error('Firebase SDK 로드 실패 — 네트워크 또는 CDN 차단일 수 있음');
+  }catch(e){ console.error('Firebase 초기화 실패', e); }
+</script>
 
 <style>
   :root{
@@ -79,17 +95,38 @@
     font-size:13px;line-height:1.6;
   }
   #aedInfoBox.show{display:block;}
+  #aedInfoClose{
+    position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;
+    background:var(--bg);border:none;color:var(--ink-soft);font-size:14px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
   #addReportEntry{
-    position:fixed;left:14px;bottom:22px;z-index:500;
+    position:fixed;right:62px;bottom:22px;z-index:500;
     background:var(--orange);color:#fff;border:none;border-radius:24px;
     padding:11px 16px;font-size:13px;font-weight:700;box-shadow:0 3px 12px rgba(0,0,0,.22);
     cursor:pointer;
   }
-  #eduEntry{
+  #myLocationEntry{
     position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top));z-index:500;
     width:40px;height:40px;border-radius:50%;background:var(--navy);color:#fff;
-    border:2px solid #fff;font-size:18px;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;
+    border:2px solid #fff;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
   }
+  #eduBar{
+    position:fixed;left:14px;bottom:22px;z-index:500;
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .edu-cat-btn{
+    flex-shrink:0;
+    background:#fff;border:1px solid var(--line);border-radius:20px;
+    padding:10px 14px;box-shadow:0 3px 12px rgba(0,0,0,.18);cursor:pointer;
+    display:flex;flex-direction:row;align-items:center;gap:6px;
+  }
+  .edu-cat-btn svg{width:17px;height:17px;flex-shrink:0;}
+  .edu-cat-btn span{font-size:14px;font-weight:800;color:var(--ink);line-height:1;white-space:nowrap;}
+  .edu-cat-btn.cpr{border:1.5px solid var(--danger);}
+  .edu-cat-btn.gear{border:1.5px solid var(--teal);}
+  .edu-cat-btn.aed{border:1.5px solid var(--orange);}
   #classifyProgress{
     display:none;position:fixed;top:calc(58px + env(safe-area-inset-top));left:14px;z-index:499;
     background:rgba(11,52,84,.9);color:#fff;font-size:11.5px;padding:6px 12px;border-radius:20px;
@@ -233,8 +270,9 @@
   .edu-section.active{display:block;}
   .step-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px;display:flex;gap:14px;align-items:flex-start;}
   .step-num{flex:0 0 26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;}
-  .step-icon{flex:0 0 64px;}
+  .step-icon{flex:0 0 84px;}
   .step-icon svg{width:64px;height:64px;}
+  .step-icon img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block;}
   .step-text{flex:1;}
   .step-text .step-title{font-weight:700;font-size:14px;margin-bottom:3px;}
   .step-text .step-desc{font-size:12.5px;color:var(--ink-soft);line-height:1.55;}
@@ -268,9 +306,26 @@
 <div id="classifyProgress"></div>
 <div id="aedInfoBox"></div>
 
-<button id="eduEntry" onclick="openEduPanel()" title="안전교육">📖</button>
+<button id="myLocationEntry" onclick="goToMyLocation()" title="내 위치로 가기">
+  <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="3" fill="#fff"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="#fff" stroke-width="2"/></svg>
+</button>
 
 <!-- 우측 하단 관리자 진입 아이콘 -->
+<div id="eduBar">
+  <button class="edu-cat-btn cpr" onclick="openEduPanel('cpr')" title="심폐소생술">
+    <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-10-9.2C.5 8.6 2.4 5 6 5c2 0 3.5 1.1 4.3 2.4L12 9.6l1.7-2.2C14.5 6.1 16 5 18 5c3.6 0 5.5 3.6 4 6.8-2.5 4.6-10 9.2-10 9.2z" fill="none" stroke="#E4572E" stroke-width="1.8"/><path d="M4 13h3l1.5-3 2 5 1.5-3H20" fill="none" stroke="#E4572E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>심폐소생술</span>
+  </button>
+  <button class="edu-cat-btn gear" onclick="openEduPanel('gear')" title="구조장비 사용법">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#0FA3B1" stroke-width="3.4"/><circle cx="12" cy="12" r="2.3" fill="#0FA3B1"/></svg>
+    <span>구조장비 사용법</span>
+  </button>
+  <button class="edu-cat-btn aed" onclick="openEduPanel('aed')" title="AED 사용법">
+    <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="3" fill="none" stroke="#FF6B35" stroke-width="1.8"/><path d="M13 5 8 13h4l-1 6 6-9h-4z" fill="#FF6B35"/></svg>
+    <span>AED 사용법</span>
+  </button>
+</div>
+
 <div id="adminEntry" title="관리자 모드">
   <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
 </div>
@@ -375,47 +430,47 @@
 
     <!-- 심폐소생술 -->
     <div class="edu-section active" id="edu-cpr">
-      <button id="metroBtn" onclick="toggleMetronome()">🔊 압박 속도 메트로놈 재생 (분당 110회)</button>
+      <button id="metroBtn" onclick="toggleMetronome()">🔊 압박 속도 메트로놈 재생 (분당 100회, 30:2 안내 포함)</button>
 
       <div class="step-card">
         <div class="step-num">1</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="32" cy="18" r="9" fill="none" stroke="#0B3454" stroke-width="3"/><path d="M32 27v20M20 34l12-7 12 7M18 55l14-8M46 55l-14-8" stroke="#0B3454" stroke-width="3" fill="none" stroke-linecap="round"/><text x="46" y="20" font-size="16">?</text></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr1.jpg" alt="반응 확인"></div>
         <div class="step-text"><div class="step-title">반응 확인</div><div class="step-desc">어깨를 가볍게 두드리며 "괜찮으세요?" 라고 크게 물어봅니다. 반응이 없으면 심장정지를 의심합니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">2</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="22" y="10" width="20" height="34" rx="4" fill="none" stroke="#FF6B35" stroke-width="3"/><circle cx="32" cy="38" r="2" fill="#FF6B35"/><text x="26" y="30" font-size="14" fill="#FF6B35">119</text></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr2.jpg" alt="119 신고"></div>
         <div class="step-text"><div class="step-title">119 신고 + AED 요청 (호흡 확인보다 먼저)</div><div class="step-desc">일반인은 호흡 상태 판단이 어려우므로, 반응이 없으면 <b>호흡을 확인하기 전에 즉시 119에 신고</b>합니다. 스피커폰을 켜고 구급상황요원의 안내를 따르세요. 주변에 사람이 있으면 신고와 AED 요청을 나눠서 부탁합니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="20" y="16" width="24" height="30" rx="6" fill="none" stroke="#0FA3B1" stroke-width="3"/><path d="M20 28 Q26 22 32 28 T44 28" stroke="#0FA3B1" stroke-width="2.5" fill="none"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr3.jpg" alt="호흡 확인"></div>
         <div class="step-text"><div class="step-title">호흡 확인 (구급상황요원과 함께)</div><div class="step-desc">숨을 쉬는지, 정상 호흡인지 확인합니다. 숨을 안 쉬거나, 헐떡이는 비정상 호흡(심장정지 호흡)이면 심장정지로 판단하고 즉시 가슴압박을 시작합니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">4</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="14" y="14" width="36" height="40" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><ellipse cx="32" cy="40" rx="8" ry="5" fill="#FF6B35"/><line x1="32" y1="14" x2="32" y2="54" stroke="#0B3454" stroke-width="1" stroke-dasharray="2,2"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr4.jpg" alt="가슴압박 자세"></div>
         <div class="step-text"><div class="step-title">가슴압박 — 위치와 자세</div><div class="step-desc"><b>복장뼈(가슴뼈) 아래쪽 절반</b> 지점에 한 손 손꿈치를 대고, 다른 손을 그 위에 겹쳐 깍지를 낍니다. 팔꿈치를 곧게 펴고 체중을 실어 수직으로 압박합니다. 주로 쓰는 손이 아래로 가는 것이 좋습니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">5</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><path d="M32 10v44M22 20l10-10 10 10M22 44l10 10 10-10" stroke="#E4572E" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr5.jpg" alt="압박 속도 깊이"></div>
         <div class="step-text"><div class="step-title">압박 속도 · 깊이</div><div class="step-desc"><b>분당 100~120회</b> 속도로, <b>약 5cm 깊이</b>(6cm는 넘지 않게)로 압박합니다. 매번 압박 후에는 가슴이 완전히 원래대로 올라오도록 힘을 뺍니다(이완). 위 메트로놈 버튼으로 속도를 맞춰볼 수 있습니다. 2분마다 압박하는 사람을 교대하면 좋습니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">6</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="24" cy="24" r="10" fill="none" stroke="#0B3454" stroke-width="3"/><path d="M34 22c8 0 14 4 14 4" stroke="#0FA3B1" stroke-width="3" fill="none" stroke-linecap="round"/><text x="8" y="50" font-size="11" fill="#0B3454">30:2</text></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr6.jpg" alt="인공호흡"></div>
         <div class="step-text"><div class="step-title">인공호흡 (교육받았고 할 수 있으면)</div><div class="step-desc">가슴압박 30회 : 인공호흡 2회 비율로 반복합니다. 머리를 뒤로 젖히고 턱을 들어 기도를 연 뒤, 1초간 가슴이 올라올 정도로 불어넣습니다. <b>인공호흡을 못하거나 꺼려지면 압박만 계속</b>해도 괜찮습니다(가슴압박소생술) — 아무것도 안 하는 것보다 훨씬 낫습니다.</div></div>
       </div>
 
       <div class="step-card">
         <div class="step-num">7</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="22" fill="none" stroke="#1E8E5A" stroke-width="3"/><path d="M22 32l7 7 14-14" stroke="#1E8E5A" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/cpr7.jpg" alt="AED 사용 및 반복"></div>
         <div class="step-text"><div class="step-title">AED 도착 즉시 사용 + 반복</div><div class="step-desc">AED가 도착하면 즉시 사용합니다(사용법은 옆 탭). 구급대가 도착하거나, 환자가 움직이거나, 정상적으로 숨을 쉴 때까지 압박과 인공호흡을 반복합니다.</div></div>
       </div>
 
@@ -430,22 +485,22 @@
       <div class="step-title" style="margin:14px 0 8px;">🛟 구명환</div>
       <div class="step-card">
         <div class="step-num">1</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="20" fill="none" stroke="#FF6B35" stroke-width="6"/><circle cx="32" cy="32" r="20" fill="none" stroke="#fff" stroke-width="1"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/ring1.jpg" alt="구명환 꺼내기"></div>
         <div class="step-text"><div class="step-desc">발견 즉시 큰소리로 주변에 알리고 119에 신고합니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">2</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="18" cy="46" r="7" fill="none" stroke="#0B3454" stroke-width="2.5"/><circle cx="46" cy="20" r="7" fill="none" stroke="#0B3454" stroke-width="2.5"/><path d="M25 40 Q35 30 40 26" stroke="#E4572E" stroke-width="2.5" fill="none" stroke-dasharray="4,3"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/ring2.jpg" alt="로프 끝 잡기"></div>
         <div class="step-text"><div class="step-desc">구명환에 연결된 줄 끝을 발로 밟거나 손에 단단히 감아쥔 뒤, 대상자보다 바람이나 물살이 흘러오는 방향(상류) 쪽에서 던질 준비를 합니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="44" cy="24" r="9" fill="none" stroke="#FF6B35" stroke-width="3"/><circle cx="16" cy="46" r="6" fill="none" stroke="#0B3454" stroke-width="2.5"/><path d="M22 42 Q32 30 38 26" stroke="#0B3454" stroke-width="2" fill="none" stroke-dasharray="3,3"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/ring3.jpg" alt="던지기"></div>
         <div class="step-text"><div class="step-desc">대상자의 몸 쪽 또는 살짝 넘어가도록 던져서, 대상자가 팔을 뻗어 구명환을 잡거나 몸에 걸칠 수 있게 합니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">4</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="10" fill="none" stroke="#FF6B35" stroke-width="3"/><path d="M32 42v14" stroke="#0B3454" stroke-width="2.5"/><path d="M20 62h24" stroke="#0B3454" stroke-width="2.5"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/ring4.jpg" alt="끌어당기기"></div>
         <div class="step-text"><div class="step-desc">대상자가 구명환을 양팔로 안거나 팔을 끼우게 한 뒤, 천천히 끌어당겨 안전한 곳으로 이동시킵니다.</div></div>
       </div>
 
@@ -469,22 +524,22 @@
       <div class="step-title" style="margin:20px 0 8px;">🎯 드로우백 (구명로프)</div>
       <div class="step-card">
         <div class="step-num">1</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="20" y="24" width="16" height="20" rx="3" fill="none" stroke="#0B3454" stroke-width="3"/><path d="M28 24c0-8 8-8 8 0" stroke="#0B3454" stroke-width="2.5" fill="none"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/bag1.jpg" alt="드로우백 꺼내기"></div>
         <div class="step-text"><div class="step-desc">가방을 열어 로프가 코일 형태로 가지런히 들어있는지 확인합니다(엉켜있으면 던졌을 때 안 풀립니다).</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">2</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="20" cy="44" r="8" fill="none" stroke="#0B3454" stroke-width="2.5"/><path d="M27 40 Q34 30 30 18" stroke="#FF6B35" stroke-width="2.5" fill="none" stroke-dasharray="4,3"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/bag2.jpg" alt="로프 끝 고정"></div>
         <div class="step-text"><div class="step-desc">가방 반대쪽 로프 끝을 자기 손목이나 손에 확실히 고정합니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="10" y="34" width="12" height="16" rx="3" fill="none" stroke="#0B3454" stroke-width="2.5"/><path d="M22 40 Q34 24 46 20" stroke="#E4572E" stroke-width="2.5" fill="none"/><circle cx="46" cy="20" r="4" fill="none" stroke="#E4572E" stroke-width="2"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/bag3.jpg" alt="던지기"></div>
         <div class="step-text"><div class="step-desc">대상자를 향해 언더핸드로 가방을 던집니다. 대상자 몸 쪽이나 살짝 넘어가게 던지는 게 좋습니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">4</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><circle cx="44" cy="20" r="7" fill="none" stroke="#FF6B35" stroke-width="2.5"/><circle cx="16" cy="46" r="7" fill="none" stroke="#0B3454" stroke-width="2.5"/><path d="M23 42 Q32 30 38 24" stroke="#0B3454" stroke-width="2" fill="none"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/bag4.jpg" alt="끌어당기기"></div>
         <div class="step-text"><div class="step-desc">대상자가 로프를 양손으로 잡으면, 자신은 낮은 자세를 유지한 채 천천히 끌어당깁니다(끌려 들어가지 않도록 주의).</div></div>
       </div>
     </div>
@@ -493,27 +548,27 @@
     <div class="edu-section" id="edu-aed">
       <div class="step-card">
         <div class="step-num">1</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="14" y="10" width="36" height="44" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><circle cx="32" cy="20" r="5" fill="#1E8E5A"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/aed1.jpg" alt="전원 켜기"></div>
         <div class="step-text"><div class="step-title">전원 켜기</div><div class="step-desc">심폐소생술을 방해하지 않는 위치에 AED를 놓고 전원 버튼을 누릅니다. 이후 음성 안내를 따라갑니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">2</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="18" y="8" width="28" height="40" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><rect x="21" y="14" width="9" height="7" fill="#FF6B35"/><rect x="34" y="30" width="9" height="7" fill="#FF6B35"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/aed2.jpg" alt="패드 부착"></div>
         <div class="step-text"><div class="step-title">패드 부착 (맨 가슴에)</div><div class="step-desc">상의를 벗기고 패드 포장지 그림대로 <b>오른쪽 빗장뼈 아래</b>와 <b>왼쪽 젖꼭지 아래 옆구리 쪽</b>에 단단히 붙입니다. <b>여성도 브래지어를 벗길 필요 없이</b> 위치만 조정해 가슴 조직을 피해 부착하면 됩니다(2025년 지침).</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">3</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><rect x="16" y="12" width="32" height="40" rx="6" fill="none" stroke="#0B3454" stroke-width="3"/><line x1="20" y1="20" x2="44" y2="44" stroke="#E4572E" stroke-width="3"/><line x1="44" y1="20" x2="20" y2="44" stroke="#E4572E" stroke-width="3"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/aed3.jpg" alt="접촉 금지"></div>
         <div class="step-text"><div class="step-title">심전도 분석 중 — 접촉 금지</div><div class="step-desc">"분석 중입니다"라는 안내가 나오면 아무도 환자 몸에 닿지 않아야 합니다. 환자가 움직이지 않게 합니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">4</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><path d="M34 6L18 34h12l-4 24 20-30H32z" fill="#FF6B35"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/aed4.jpg" alt="제세동 버튼"></div>
         <div class="step-text"><div class="step-title">필요시 제세동 (충격) 버튼</div><div class="step-desc">"제세동이 필요합니다"라는 안내가 나오면, 모두 환자에게서 떨어졌는지 확인한 뒤 깜빡이는 버튼을 누릅니다. "필요하지 않습니다"라고 안내되면 그대로 다음 단계로 넘어갑니다.</div></div>
       </div>
       <div class="step-card">
         <div class="step-num">5</div>
-        <div class="step-icon"><svg viewBox="0 0 64 64"><path d="M32 10v44M22 20l10-10 10 10M22 44l10 10 10-10" stroke="#1E8E5A" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="step-icon"><img src="./icon/Edu/aed5.jpg" alt="즉시 압박 재개"></div>
         <div class="step-text"><div class="step-title">즉시 가슴압박 재개</div><div class="step-desc">충격을 주었든 안 주었든, 곧바로 가슴압박을 다시 시작합니다. AED는 2분마다 자동으로 심전도를 다시 분석합니다. 구급대가 도착할 때까지 반복합니다.</div></div>
       </div>
       <div class="src-box">출처: 2025년 한국 심폐소생술 가이드라인 (질병관리청·대한심폐소생협회)</div>
@@ -592,9 +647,14 @@
       <div class="card">
         <div class="hint">전체 <b id="totalCount">0</b>건 중 <b>검색으로 좁혀서</b> 편집하는 걸 권장합니다(한 번에 너무 많이 그리면 느려질 수 있음). 셀을 직접 눌러 값을 고친 뒤 아래 <b>보이는 항목 저장</b>을 눌러야 반영됩니다. 🗑 로 개별 삭제.</div>
         <input type="text" id="bulkEditSearch" placeholder="주소로 검색 (예: 안인진리)" oninput="onBulkSearch()">
-        <select id="bulkEditRegionFilter" onchange="onBulkSearch()" style="margin-top:8px;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:14.5px;background:#FBFDFE;">
-          <option value="all">행정구역: 전체</option>
-        </select>
+        <div class="row" style="margin-top:8px;gap:8px;">
+          <select id="bulkSidoFilter" onchange="onBulkSidoChange()" style="flex:1;padding:11px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+            <option value="all">도/광역시: 전체</option>
+          </select>
+          <select id="bulkSigunguFilter" onchange="onBulkSearch()" style="flex:1;padding:11px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+            <option value="all">시/군/구: 전체</option>
+          </select>
+        </div>
         <div style="overflow-x:auto;margin-top:10px;">
           <table class="bulk" id="bulkEditTable">
             <thead><tr><th>주소</th><th>위도</th><th>경도</th><th>비고</th><th></th></tr></thead>
@@ -610,7 +670,18 @@
     <div class="panel" id="panel-requests">
       <div class="card">
         <div class="hint">일반 사용자가 보낸 <b>수정/신규제보/삭제신고</b>입니다. 사진·사유·제안 위치를 확인하고 승인/반려하세요. <b>자동승인된 건은 여기 안 뜨고 이미 반영된 상태</b>이며 변경이력 탭에서 확인 가능합니다.</div>
-        <div id="requestsList"></div>
+        <div class="row" style="gap:8px;">
+          <select id="reqMonthFilter" onchange="renderRequestsList()" style="flex:1;padding:10px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+            <option value="all">연월: 전체</option>
+          </select>
+          <select id="reqSidoFilter" onchange="onReqSidoChange()" style="flex:1;padding:10px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+            <option value="all">도/광역시: 전체</option>
+          </select>
+        </div>
+        <select id="reqSigunguFilter" onchange="renderRequestsList()" style="width:100%;margin-top:8px;padding:10px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+          <option value="all">시/군/구: 전체</option>
+        </select>
+        <div id="requestsList" style="margin-top:12px;"></div>
       </div>
     </div>
 
@@ -618,6 +689,17 @@
       <div class="card">
         <div class="hint">민간인이 제출한 <b>모든</b> 수정/신규/삭제 건의 전체 기록입니다(자동승인·관리자승인·반려 포함). 사유와 사진이 함께 보관됩니다.</div>
         <input type="text" id="historySearch" placeholder="주소 또는 사유로 검색" oninput="renderHistoryList()">
+        <div class="row" style="gap:8px;margin-top:8px;">
+          <select id="histMonthFilter" onchange="renderHistoryList()" style="flex:1;padding:10px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+            <option value="all">연월: 전체</option>
+          </select>
+          <select id="histSidoFilter" onchange="onHistSidoChange()" style="flex:1;padding:10px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+            <option value="all">도/광역시: 전체</option>
+          </select>
+        </div>
+        <select id="histSigunguFilter" onchange="renderHistoryList()" style="width:100%;margin-top:8px;padding:10px 8px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;background:#FBFDFE;">
+          <option value="all">시/군/구: 전체</option>
+        </select>
         <div style="font-size:12px;color:var(--ink-soft);margin:8px 0;">전체 <b id="historyCount">0</b>건</div>
         <div id="historyList"></div>
       </div>
@@ -628,53 +710,115 @@
 
 <script>
 /* =========================================================
-   데이터 계층 (지금은 localStorage / 추후 Firestore로 교체)
-   레코드 구조: {id, lat, lng, addr, note, updatedAt}
+   데이터 계층 — Firebase Firestore 실시간 동기화
+   레코드 구조: {id, lat, lng, addr, note, region, updatedAt}
    ========================================================= */
-const STORAGE_KEY = 'gujohham_records_v1';
 const ADMIN_CODE = '22222';
-
-function loadRecords(){
-  // ensureLoaded() 완료 이후에만 최신값을 반환하는 동기 접근용 헬퍼
-  return _cache || [];
-}
+const SEED_JSON_URL = './lifesavers.json'; // 파이어스토어가 비어있을 때 최초 1회만 씀
 
 let _cache = null;
-const SEED_JSON_URL = './lifesavers.json'; // 원본 좌표는 별도 파일 — 이 파일과 같은 폴더에 둘 것
+let _resolveLoaded = null;
+const _loadedPromise = new Promise(res=>{ _resolveLoaded = res; });
+let _firstSnapshot = true;
 
-async function ensureLoaded(){
-  if(_cache) return _cache;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if(raw){ _cache = JSON.parse(raw); return _cache; }
-  // localStorage가 비어있을 때(최초 실행) lifesavers.json에서 1회 불러와 시드로 사용
+let db = null, lifesaversCol = null;
+try{
+  if(typeof firebase === 'undefined') throw new Error('firebase SDK가 로드되지 않았습니다');
+  db = firebase.firestore();
+  // 오프라인 캐시 켜기 — 같은 기기/브라우저로 재방문하면 로컬에 저장된 데이터를 먼저 쓰고
+  // 바뀐 것만 새로 읽어와서, 매번 3,647건 전체를 다시 읽는 걸 방지(무료 읽기 한도 절약)
+  db.enablePersistence().catch(e=>{
+    console.warn('오프라인 캐시 비활성(다른 탭이 열려있거나 브라우저 미지원):', e.code);
+  });
+  lifesaversCol = db.collection('lifesavers');
+} catch(e){
+  console.error('Firestore 초기화 실패 — 데이터 기능이 동작하지 않습니다:', e);
+}
+
+if(lifesaversCol){
+// Firestore 실시간 리스너 — 어디서든(다른 기기 포함) 데이터가 바뀌면 자동으로 _cache 갱신 + 지도 재표시
+lifesaversCol.onSnapshot(async (snapshot)=>{
+  if(_firstSnapshot){
+    _firstSnapshot = false;
+    const done = await resumeSeedIfNeeded(snapshot.size);
+    if(done) return; // 시딩(또는 이어서 채우기)이 실행됐으면 onSnapshot이 다시 호출되므로 여기서 종료
+  }
+  const list = [];
+  snapshot.forEach(doc=> list.push({ id: doc.id, ...doc.data() }));
+  _cache = list;
+  if(_resolveLoaded){ _resolveLoaded(_cache); _resolveLoaded = null; }
+  if(typeof map !== 'undefined' && map && typeof clusterer !== 'undefined' && clusterer){ debouncedRenderAllMarkers(); }
+}, (err)=>{
+  console.error('Firestore 연결 실패', err);
+  if(_resolveLoaded){ _cache = _cache || []; _resolveLoaded(_cache); _resolveLoaded = null; }
+});
+} else {
+  // Firestore를 아예 못 쓰는 상태(SDK 로드 실패 등) — 앱이 멈추지 않도록 빈 목록으로 대체
+  _cache = [];
+  if(_resolveLoaded){ _resolveLoaded(_cache); _resolveLoaded = null; }
+}
+
+// 현재 문서 수가 lifesavers.json 건수보다 적으면(최초 시딩이 중간에 끊긴 경우 포함) 부족한 만큼 이어서 채워 넣음.
+// 이미 있는 문서는 같은 id로 덮어써도 내용이 같아 무해함 — 안전하게 몇 번을 다시 실행해도 됨.
+async function resumeSeedIfNeeded(currentSize){
   try{
     const res = await fetch(SEED_JSON_URL);
     if(!res.ok) throw new Error('HTTP '+res.status);
-    const raw2 = await res.json(); // [{lat,lng}, ...] 원본 형식 그대로
-    const seed = raw2.map((r,i)=>({
-      id:'ls'+(i+1), lat:r.lat, lng:r.lng,
-      addr:r.addr||'', note:r.note||'', updatedAt:Date.now()
-    }));
-    _cache = seed;
-    saveRecords(seed);
+    const raw = await res.json();
+    if(currentSize >= raw.length) return false; // 이미 다 채워져 있음
+    console.warn(`시딩이 ${currentSize}/${raw.length}건만 된 상태 — 나머지를 이어서 채웁니다`);
+    await seedFromJson(raw);
+    return true;
   }catch(e){
-    console.error('lifesavers.json 로드 실패 — 파일 경로/로컬서버 여부를 확인하세요', e);
-    _cache = [];
+    console.error('시딩 상태 확인 실패', e);
+    return false;
   }
-  return _cache;
 }
 
-function saveRecords(list){ _cache = list; localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+// lifesavers.json 전체를 파이어스토어에 채워 넣음(이미 있는 id는 덮어쓰기라 안전, 중간에 끊겨도 재실행하면 이어짐)
+async function seedFromJson(preloaded){
+  try{
+    const raw = preloaded || await (async ()=>{
+      const res = await fetch(SEED_JSON_URL);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    })();
+    let batch = db.batch();
+    let count = 0;
+    for(let i=0;i<raw.length;i++){
+      const r = raw[i];
+      const id = 'ls'+(i+1);
+      const docRef = lifesaversCol.doc(id);
+      batch.set(docRef, { lat:r.lat, lng:r.lng, addr:r.addr||'', note:r.note||'', updatedAt: Date.now() });
+      count++;
+      if(count % 450 === 0){ await batch.commit(); batch = db.batch(); }
+    }
+    await batch.commit();
+    console.log('초기 데이터 시딩 완료:', raw.length, '건');
+  }catch(e){
+    console.error('초기 시딩 실패', e);
+  }
+}
+
+async function ensureLoaded(){ return _loadedPromise; }
+function loadRecords(){ return _cache || []; }
+
+// 화면 반응은 즉시(낙관적 갱신), 실제 저장은 Firestore로 — 다른 사용자에게는 onSnapshot으로 곧 반영됨
 function upsertRecord(rec){
+  rec.updatedAt = Date.now();
   const list = loadRecords();
   const i = list.findIndex(r=>r.id===rec.id);
-  rec.updatedAt = Date.now();
   if(i>-1) list[i] = {...list[i], ...rec}; else list.push(rec);
-  saveRecords(list);
+  _cache = list;
+  if(lifesaversCol){
+    const {id, ...data} = rec;
+    lifesaversCol.doc(rec.id).set(data, {merge:true}).catch(e=>console.error('Firestore 저장 실패', e));
+  }
   return list;
 }
 function deleteRecord(id){
-  saveRecords(loadRecords().filter(r=>r.id!==id));
+  _cache = loadRecords().filter(r=>r.id!==id);
+  if(lifesaversCol) lifesaversCol.doc(id).delete().catch(e=>console.error('Firestore 삭제 실패', e));
 }
 function newId(){ return 'g' + Date.now() + Math.floor(Math.random()*1000); }
 
@@ -769,6 +913,11 @@ async function initMap(){
   populateRegionSelect();
   classifyMissingRegions();       // 아직 행정구역이 안 붙은 좌표만 백그라운드로 분류(최초 1회, 이후 캐시됨)
 
+  // AED는 기본적으로 항상 켜진 상태로 시작 — 버튼은 이제 껐다 켜는 토글 용도
+  aedState.on = true;
+  document.getElementById('aedToggleBtn').classList.add('on');
+  loadAedForCurrentRegion();
+
   // 처음엔 내 GPS 위치를 중심으로 — 이후엔 지도를 강제로 다시 옮기지 않음(사용자가 팬/줌하면 그대로 둠)
   centerMapOnMyLocationOnce();
   startMyLocationTracking();
@@ -777,10 +926,26 @@ async function initMap(){
   kakao.maps.event.addListener(map, 'idle', ()=>{ if(aedState.on) loadAedForCurrentRegion(); });
 }
 
+// 우측 상단 버튼으로 언제든 다시 내 위치로 이동(한 번만, 강제 추적 아님)
+function goToMyLocation(){
+  if(!navigator.geolocation){ alert('이 기기에서 위치 기능을 지원하지 않습니다.'); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+      map.setLevel(4);
+    },
+    (err)=>{ alert('위치를 가져오지 못했습니다. 위치 권한을 확인해주세요.'); },
+    { enableHighAccuracy:true, timeout:8000, maximumAge:0 }
+  );
+}
+
 function centerMapOnMyLocationOnce(){
   if(!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    (pos)=>{ map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude)); },
+    (pos)=>{
+      map.setCenter(new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude));
+      map.setLevel(4); // 도로가 보일 정도로 가깝게 (기본 9는 해안 전체가 보이는 넓은 축척)
+    },
     (err)=>{ console.warn('초기 위치 가져오기 실패(기본 강릉 중심 유지):', err.message); },
     { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
   );
@@ -807,6 +972,12 @@ function startMyLocationTracking(){
     (err)=>{ console.warn('위치 추적 실패:', err.message); },
     { enableHighAccuracy:true, maximumAge:5000, timeout:10000 }
   );
+}
+
+let _renderDebounceTimer = null;
+function debouncedRenderAllMarkers(){
+  clearTimeout(_renderDebounceTimer);
+  _renderDebounceTimer = setTimeout(renderAllMarkers, 400);
 }
 
 function renderAllMarkers(){
@@ -842,19 +1013,25 @@ async function classifyMissingRegions(){
   const BATCH = 15;
   let done = 0;
   for(let i=0; i<todo.length; i+=BATCH){
-    const batch = todo.slice(i, i+BATCH);
-    await Promise.all(batch.map(async rec=>{
+    const chunk = todo.slice(i, i+BATCH);
+    await Promise.all(chunk.map(async rec=>{
       rec.region = await coord2RegionName(rec.lat, rec.lng);
     }));
-    done += batch.length;
+    // 카카오 조회는 개별로(동시에) 하되, 파이어스토어 저장은 15건을 한 번의 배치로 묶어서
+    // 쓰기 요청 수와 실시간 리스너 호출 횟수를 크게 줄임(빠른 연속 재렌더링 방지)
+    if(lifesaversCol){
+      const fbBatch = db.batch();
+      chunk.forEach(rec=> fbBatch.update(lifesaversCol.doc(rec.id), { region: rec.region }));
+      fbBatch.commit().catch(e=>console.error('region 배치 저장 실패', e));
+    }
+    done += chunk.length;
     progress.textContent = `지역 분류 중… ${done}/${todo.length} (앱을 계속 써도 됩니다)`;
-    saveRecords(loadRecords());   // 중간에 앱을 꺼도 이어서 하도록 주기적으로 저장
     populateRegionSelect();
-    populateBulkRegionFilter(loadRecords());   // 관리자가 대량수정 탭을 보고 있으면 건수 실시간 갱신
+    if(document.getElementById('panel-bulkEdit')?.classList.contains('active')) buildBulkEditTable();
   }
   progress.classList.remove('show');
   populateRegionSelect();
-  populateBulkRegionFilter(loadRecords());
+  if(document.getElementById('panel-bulkEdit')?.classList.contains('active')) buildBulkEditTable();
 }
 
 function populateRegionSelect(){
@@ -880,16 +1057,12 @@ function onRegionChange(){
 
 /* =========================================================
    AED(자동심장충격기) 레이어 — 조회 전용, 수정/삭제 없음, 길찾기만 가능
-   ⚠️ 아래 SERVICE_KEY / 요청·응답 필드명은 data.go.kr 활용신청 페이지의
-   "요청변수/출력결과" 표를 보내주면 정확히 맞춰서 고칠 예정 (현재는 최선 추정치)
+   ⚠️ 이 키는 브라우저 소스에 그대로 노출됩니다(공개 저장소이므로 누구나 볼 수 있음).
+   나중에 여유 생기면 Cloudflare Worker로 숨기는 걸 권장하지만, 지금은 가입 없이
+   바로 동작하는 걸 우선해서 예전처럼 직접 호출 방식으로 되돌렸습니다.
    ========================================================= */
-// ⚠️ 이 키는 data.go.kr에서 발급된 "인코딩된" 키입니다(%2F, %3D 등 포함).
-// 절대 URLSearchParams 등에 넣어 다시 인코딩하지 말고, 아래처럼 URL 문자열에 그대로 붙여야 합니다.
 const AED_SERVICE_KEY_ENCODED = 'TUbUhIiFWVRorR5hyktEuzY05oGV0Wd%2FTohPPdjOB27lUHRN521Oc6cJD%2BityxwoJzleTCzC%2BBYOroBVoyOxhA%3D%3D';
 const AED_API_URL = 'https://apis.data.go.kr/B552657/AEDInfoInqireService/getEgytAedManageInfoInqire';
-// CORS 때문에 브라우저에서 직접 호출이 막히면, 아래에 Cloudflare Worker 프록시 주소를 넣고 켜세요.
-// 예: const AED_PROXY_PREFIX = 'https://aed-proxy.내계정.workers.dev/?url=';
-const AED_PROXY_PREFIX = ''; // 비워두면 직접 호출, 값 넣으면 그 앞에 붙여서 프록시로 우회
 
 let aedState = { on:false, markers:[] };
 
@@ -910,49 +1083,49 @@ function clearAedMarkers(){
 }
 
 async function loadAedForCurrentRegion(){
-  const box = document.getElementById('aedInfoBox');
   if(!map){
-    box.classList.add('show');
-    box.innerHTML = '⚠️ 지도가 아직 준비되지 않았습니다. 화면 위쪽에 지도 로딩 에러 배너가 떠 있는지 확인해주세요 (카카오 앱키/도메인 등록 문제일 수 있어요).';
+    setAedInfoMsg('⚠️ 지도가 아직 준비되지 않았습니다. 화면 위쪽에 지도 로딩 에러 배너가 떠 있는지 확인해주세요 (카카오 앱키/도메인 등록 문제일 수 있어요).');
     return;
   }
-  box.classList.add('show');
-  box.innerHTML = '📡 이 지역 AED 정보를 불러오는 중…';
+  setAedInfoMsg('📡 이 지역 AED 정보를 불러오는 중…');
   // 지도 중심 좌표를 카카오 좌표→행정구역 API로 시도/시군구 이름을 얻어서 AED 조회에 사용
   const center = map.getCenter();
   const regionName = await coord2RegionName(center.getLat(), center.getLng());
   if(!regionName || regionName==='기타'){
-    box.innerHTML = '⚠️ 현재 지도 위치의 행정구역을 확인하지 못했습니다. 지도를 조금 이동한 뒤 다시 시도해주세요.';
+    setAedInfoMsg('⚠️ 현재 지도 위치의 행정구역을 확인하지 못했습니다. 지도를 조금 이동한 뒤 다시 시도해주세요.');
     return;
   }
   const [sido, sigungu] = regionName.split(' ');
   fetchAed(sido, sigungu);
 }
 
+function setAedInfoMsg(html){
+  const box = document.getElementById('aedInfoBox');
+  box.classList.add('show');
+  box.innerHTML = `<button id="aedInfoClose" onclick="closeAedInfo()">✕</button><div style="padding-right:20px;">${html}</div>`;
+}
+
 async function fetchAed(sido, sigungu){
   clearAedMarkers();
   try{
     // serviceKey는 이미 인코딩돼 있으므로 문자열로 직접 붙이고, 나머지 값만 encodeURIComponent 처리
-    const targetUrl = `${AED_API_URL}?serviceKey=${AED_SERVICE_KEY_ENCODED}`
+    const url = `${AED_API_URL}?serviceKey=${AED_SERVICE_KEY_ENCODED}`
       + `&Q0=${encodeURIComponent(sido)}&Q1=${encodeURIComponent(sigungu)}`
       + `&pageNo=1&numOfRows=100`;
-    const url = AED_PROXY_PREFIX ? (AED_PROXY_PREFIX + encodeURIComponent(targetUrl)) : targetUrl;
     const res = await fetch(url);
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     const items = parseAedXml(text);
     if(!items.length){
-      document.getElementById('aedInfoBox').classList.add('show');
-      document.getElementById('aedInfoBox').innerHTML = `<b>${sido} ${sigungu}</b> 지역에서 AED 데이터를 찾지 못했습니다.`;
+      setAedInfoMsg(`<b>${sido} ${sigungu}</b> 지역에서 AED 데이터를 찾지 못했습니다.`);
       return;
     }
+    closeAedInfo(); // 마커가 여러 개 뜨는 정상 케이스면 안내 박스는 닫아서 지도를 가리지 않게 함
     items.forEach(item=>renderAedMarker(item));
   }catch(e){
     console.error('AED 조회 실패', e);
     // CORS 차단이면 브라우저 콘솔에 "has been blocked by CORS policy" 메시지가 뜸 — 그 경우 프록시 필요
-    document.getElementById('aedInfoBox').classList.add('show');
-    document.getElementById('aedInfoBox').innerHTML =
-      `AED 정보를 불러오지 못했습니다. (원인: 앱키 미설정, 또는 이 API가 브라우저 직접호출을 막는 CORS 정책일 수 있음)`;
+    setAedInfoMsg('AED 정보를 불러오지 못했습니다. (원인: 앱키 미설정, 또는 이 API가 브라우저 직접호출을 막는 CORS 정책일 수 있음)');
   }
 }
 
@@ -1055,12 +1228,16 @@ function showAedInfo(a){
   const badgeColor = status.available===true ? '#1E8E5A' : status.available===false ? 'var(--danger)' : 'var(--ink-soft)';
   const box = document.getElementById('aedInfoBox');
   box.innerHTML = `
-    <div style="font-weight:700;margin-bottom:4px;">🚑 ${a.name}</div>
+    <button id="aedInfoClose" onclick="closeAedInfo()">✕</button>
+    <div style="font-weight:700;margin-bottom:4px;padding-right:20px;">🚑 ${a.name}</div>
     <div style="color:var(--ink-soft);margin-bottom:6px;">${a.address}${a.place ? ' · '+a.place : ''}</div>
     <div style="color:${badgeColor};font-weight:700;margin-bottom:10px;">${status.label}</div>
     <button class="btn btn-primary btn-sm" onclick="openAedDirections(${a.lat},${a.lng},'${(a.name||'AED').replace(/'/g,"")}')">🚗 이 AED로 길찾기</button>
   `;
   box.classList.add('show');
+}
+function closeAedInfo(){
+  document.getElementById('aedInfoBox').classList.remove('show');
 }
 
 function openAedDirections(lat, lng, name){
@@ -1076,7 +1253,10 @@ function buildMarker(rec){
   kakao.maps.event.addListener(marker, 'click', ()=>openMarkerSheet(rec.id));
   kakao.maps.event.addListener(marker, 'dragend', ()=>{
     const p = marker.getPosition();
-    upsertRecord({...markerObjs[rec.id].record, lat:p.getLat(), lng:p.getLng(), region: undefined});
+    const before = markerObjs[rec.id].record;
+    const oldLat = before.lat, oldLng = before.lng;
+    upsertRecord({...before, lat:p.getLat(), lng:p.getLng(), region: undefined});
+    logAdminChange('edit', rec.id, before.addr, oldLat, oldLng, p.getLat(), p.getLng(), '관리자 아이콘 드래그 이동');
     markerObjs[rec.id].record.lat = p.getLat();
     markerObjs[rec.id].record.lng = p.getLng();
     markerObjs[rec.id].record.region = undefined;
@@ -1132,10 +1312,41 @@ function haversineMeters(lat1, lon1, lat2, lon2){
   return 2*R*Math.asin(Math.sqrt(a));
 }
 
-function loadRequests(){
-  try{ return JSON.parse(localStorage.getItem(REQUESTS_KEY)) || []; }catch(e){ return []; }
+let _reqCache = [];
+const changelogCol = lifesaversCol ? db.collection('changelog') : null;
+if(changelogCol){
+  changelogCol.onSnapshot((snapshot)=>{
+    const list = [];
+    snapshot.forEach(doc=> list.push({ id: doc.id, ...doc.data() }));
+    _reqCache = list;
+    // 지금 관리자가 수정요청/변경이력 탭을 보고 있으면 화면도 같이 갱신
+    if(document.getElementById('panel-requests')?.classList.contains('active')) doRenderRequestsList();
+    if(document.getElementById('panel-history')?.classList.contains('active')) doRenderHistoryList();
+    if(typeof refreshRequestBadge==='function') refreshRequestBadge();
+  }, (err)=>console.error('변경이력 연결 실패', err));
 }
-function saveRequests(list){ localStorage.setItem(REQUESTS_KEY, JSON.stringify(list)); }
+function loadRequests(){ return _reqCache || []; }
+// 요청/이력 항목 하나를 저장(신규 생성 또는 일부 필드만 갱신). 전체 목록을 다시 쓰지 않고 그 문서 하나만 씀.
+function upsertRequestEntry(entry){
+  const list = loadRequests();
+  const i = list.findIndex(r=>r.id===entry.id);
+  if(i>-1) list[i] = {...list[i], ...entry}; else list.push(entry);
+  _reqCache = list;
+  if(changelogCol){
+    const {id, ...data} = entry;
+    changelogCol.doc(entry.id).set(data, {merge:true}).catch(e=>console.error('이력 저장 실패', e));
+  }
+}
+// 관리자가 화면에서 직접 신규/수정/삭제할 때도 이력에 자동 기록(승인 절차 없이 바로 approved 상태로)
+function logAdminChange(type, targetId, addr, oldLat, oldLng, newLat, newLng, reason){
+  upsertRequestEntry({
+    id: newId(), type, targetId,
+    addr: addr||'', oldLat: oldLat??null, oldLng: oldLng??null, newLat: newLat??null, newLng: newLng??null,
+    reason: reason || '관리자 직접 작업', source:'admin',
+    photoDataUrl: null, photoGPS: null, distance: null,
+    submittedAt: Date.now(), resolvedAt: Date.now(), status: 'approved'
+  });
+}
 
 const REPORT_COPY = {
   edit: {
@@ -1352,9 +1563,8 @@ function submitReport(){
   }
 
   // 자동승인이든 대기든 무조건 이력에 남김 — 관리자가 전체 변경이력을 확인할 수 있게
-  const reqs = loadRequests();
-  reqs.push(entry);
-  saveRequests(reqs);
+  entry.source = 'civilian';
+  upsertRequestEntry(entry);
   refreshRequestBadge();
 
   setTimeout(()=>{ closeReportFlow(); }, 1600);
@@ -1459,7 +1669,10 @@ function readRational3(view, tiffStart, ifdOffset, tag, little){
 /* =========================================================
    안전교육 패널 (심폐소생술 / 구조장비 사용법 / AED 사용법)
    ========================================================= */
-function openEduPanel(){ document.getElementById('eduPanel').classList.add('show'); }
+function openEduPanel(tab){
+  document.getElementById('eduPanel').classList.add('show');
+  if(tab) switchEdu(tab);
+}
 function closeEduPanel(){
   document.getElementById('eduPanel').classList.remove('show');
   stopMetronome();
@@ -1471,37 +1684,115 @@ function switchEdu(name){
   if(name!=='cpr') stopMetronome();
 }
 
-// 압박 속도 메트로놈 — 분당 110회(2025 가이드라인 100~120회 권장 구간의 중간값), 순수 합성음(Web Audio API)
+// 압박 속도 메트로놈 — 분당 100회(2025 가이드라인 100~120회 권장 구간의 하한값), 순수 합성음(Web Audio API)
 let metroCtx = null, metroTimer = null, metroOn = false;
-const METRO_BPM = 110;
+const METRO_BPM = 100;
 
 function toggleMetronome(){
   if(metroOn) stopMetronome(); else startMetronome();
 }
+
+let metroCompressionCount = 0;
+let metroPhase = 'compress'; // 'compress' | 'breath'
+
 function startMetronome(){
   if(!metroCtx) metroCtx = new (window.AudioContext || window.webkitAudioContext)();
   metroOn = true;
-  document.getElementById('metroBtn').textContent = '⏹ 정지 (재생 중 · 분당 110회)';
+  metroCompressionCount = 0;
+  metroPhase = 'compress';
   document.getElementById('metroBtn').classList.add('playing');
-  const intervalMs = 60000 / METRO_BPM;
-  const beep = ()=>{
-    const osc = metroCtx.createOscillator();
-    const gain = metroCtx.createGain();
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.35, metroCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, metroCtx.currentTime + 0.08);
-    osc.connect(gain).connect(metroCtx.destination);
-    osc.start();
-    osc.stop(metroCtx.currentTime + 0.09);
-  };
-  beep();
-  metroTimer = setInterval(beep, intervalMs);
+  runCompressionBeat();
 }
+
+function beepTone(freq, durationSec, gainLevel){
+  const osc = metroCtx.createOscillator();
+  const gain = metroCtx.createGain();
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(gainLevel, metroCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, metroCtx.currentTime + durationSec);
+  osc.connect(gain).connect(metroCtx.destination);
+  osc.start();
+  osc.stop(metroCtx.currentTime + durationSec + 0.01);
+}
+
+// 실제 "후~" 하는 숨소리처럼 들리도록 화이트노이즈 + 필터로 합성 (단순 삐- 소리 대신)
+function playBreathSound(){
+  const dur = 1.1; // 들숨~날숨 한 번 분량
+  const bufferSize = metroCtx.sampleRate * dur;
+  const buffer = metroCtx.createBuffer(1, bufferSize, metroCtx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){ data[i] = Math.random()*2-1; } // 화이트노이즈
+
+  const noise = metroCtx.createBufferSource();
+  noise.buffer = buffer;
+
+  // 대역통과 필터로 "쉬익~" 하는 숨소리 톤을 만들고, 주파수를 살짝 낮춰가며 날숨 느낌을 냄
+  const filter = metroCtx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = 0.7;
+  filter.frequency.setValueAtTime(700, metroCtx.currentTime);
+  filter.frequency.linearRampToValueAtTime(300, metroCtx.currentTime + dur);
+
+  const gain = metroCtx.createGain();
+  gain.gain.setValueAtTime(0.0001, metroCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.5, metroCtx.currentTime + dur*0.35);   // 들숨(점점 커짐)
+  gain.gain.exponentialRampToValueAtTime(0.0001, metroCtx.currentTime + dur);     // 날숨(점점 작아짐)
+
+  noise.connect(filter).connect(gain).connect(metroCtx.destination);
+  noise.start();
+  noise.stop(metroCtx.currentTime + dur + 0.05);
+}
+
+function runCompressionBeat(){
+  if(!metroOn) return;
+  const intervalMs = 60000 / METRO_BPM;
+  const btn = document.getElementById('metroBtn');
+  const tick = ()=>{
+    if(!metroOn) return;
+    beepTone(880, 0.08, 0.35);
+    metroCompressionCount++;
+    btn.textContent = `⏹ 압박 중 (${metroCompressionCount}/30) · 분당 100회`;
+    if(metroCompressionCount >= 30){
+      clearInterval(metroTimer);
+      runBreathCue();
+    }
+  };
+  tick();
+  metroTimer = setInterval(tick, intervalMs);
+}
+
+function runBreathCue(){
+  if(!metroOn) return;
+  const btn = document.getElementById('metroBtn');
+  btn.textContent = '🫁 인공호흡 2회 (압박 중지)';
+  // 음성 안내 지원 브라우저면 "인공호흡 두 번"을 말로 안내, 아니면 저음 톤 2번으로 대체
+  if(window.speechSynthesis){
+    try{
+      const utter = new SpeechSynthesisUtterance('인공호흡 두 번');
+      utter.lang = 'ko-KR';
+      utter.rate = 1.0;
+      speechSynthesis.speak(utter);
+    }catch(e){ /* 음성 실패해도 아래 톤으로 대체됨 */ }
+  }
+  // 실제 숨소리 2번, 한 번당 3초 간격(0초, 3초 지점)으로 배치
+  playBreathSound();
+  setTimeout(()=>{ if(metroOn) playBreathSound(); }, 3000);
+
+  // 인공호흡 2회(1회당 3초, 총 6초) 뒤 다시 압박 30회로 복귀
+  setTimeout(()=>{
+    if(!metroOn) return;
+    metroCompressionCount = 0;
+    runCompressionBeat();
+  }, 6000);
+}
+
 function stopMetronome(){
   metroOn = false;
   if(metroTimer) clearInterval(metroTimer);
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  metroCompressionCount = 0;
   const btn = document.getElementById('metroBtn');
-  if(btn){ btn.textContent = '🔊 압박 속도 메트로놈 재생 (분당 110회)'; btn.classList.remove('playing'); }
+  if(btn){ btn.textContent = '🔊 압박 속도 메트로놈 재생 (분당 100회, 30:2 안내 포함)'; btn.classList.remove('playing'); }
 }
 
 function openDirections(){
@@ -1559,8 +1850,10 @@ function saveEditCoord(){
     const m=document.getElementById('markerMsg'); m.textContent='위도/경도를 숫자로 입력하세요.'; m.className='msg err'; m.style.display='block';
     return;
   }
-  const rec = {...markerObjs[currentMarkerId].record, lat, lng, addr, region: undefined};
+  const before = markerObjs[currentMarkerId].record;
+  const rec = {...before, lat, lng, addr, region: undefined};
   upsertRecord(rec);
+  logAdminChange('edit', rec.id, addr||before.addr, before.lat, before.lng, lat, lng, '관리자 좌표 직접수정');
   markerObjs[currentMarkerId].record = rec;
   markerObjs[currentMarkerId].marker.setPosition(new kakao.maps.LatLng(lat,lng));
   clusterer.redraw();
@@ -1591,8 +1884,10 @@ function deleteMarker(){
   if(!isAdmin) return;
   if(!confirm('이 구조함을 삭제할까요? 되돌릴 수 없습니다.')) return;
   const id = currentMarkerId;
+  const rec = markerObjs[id].record;
   clusterer.removeMarker(markerObjs[id].marker);
   deleteRecord(id);
+  logAdminChange('delete', id, rec.addr, rec.lat, rec.lng, null, null, '관리자 직접 삭제');
   delete markerObjs[id];
   closeMarkerSheet();
 }
@@ -1742,20 +2037,26 @@ const STATUS_COLOR = {
 };
 
 function renderReqCard(r, actionable){
-  const dist = r.distance!=null ? `${Math.round(r.distance)}m 차이` : '위치정보 없음';
-  const gpsLine = r.photoGPS ? `사진 GPS: ${r.photoGPS.lat.toFixed(6)}, ${r.photoGPS.lng.toFixed(6)}` : '사진에 위치정보 없음';
+  const dist = r.distance!=null ? `${Math.round(r.distance)}m 차이` : '';
+  const gpsLine = r.photoGPS ? `사진 GPS: ${r.photoGPS.lat.toFixed(6)}, ${r.photoGPS.lng.toFixed(6)}` : (r.source==='admin' ? '' : '사진에 위치정보 없음');
+  const fmt = (v)=> (v==null || isNaN(v)) ? '—' : Number(v).toFixed(6);
   const coordLine = r.type==='add'
-    ? `<b>제안 좌표</b>: ${r.newLat.toFixed(6)}, ${r.newLng.toFixed(6)}`
-    : `<b>기존 좌표</b>: ${(r.oldLat??0).toFixed(6)}, ${(r.oldLng??0).toFixed(6)}<br><b>제안/확인 좌표</b>: ${r.newLat.toFixed(6)}, ${r.newLng.toFixed(6)}`;
+    ? `<b>제안 좌표</b>: ${fmt(r.newLat)}, ${fmt(r.newLng)}`
+    : r.type==='delete'
+      ? `<b>삭제된 좌표</b>: ${fmt(r.oldLat)}, ${fmt(r.oldLng)}`
+      : `<b>기존 좌표</b>: ${fmt(r.oldLat)}, ${fmt(r.oldLng)}<br><b>변경 좌표</b>: ${fmt(r.newLat)}, ${fmt(r.newLng)}`;
+  const sourceBadge = r.source==='admin'
+    ? `<span style="color:var(--navy);font-weight:700;">🛡 관리자 직접</span>`
+    : `<span style="color:var(--orange);font-weight:700;">👤 민간인 제보</span>`;
   return `
     <div class="req-card">
-      <img src="${r.photoDataUrl}">
+      ${r.photoDataUrl ? `<img src="${r.photoDataUrl}">` : ''}
       <div class="req-meta">
-        <b>${TYPE_LABEL[r.type]||r.type}</b> · <span style="color:${STATUS_COLOR[r.status]};font-weight:700;">${STATUS_LABEL[r.status]||r.status}</span><br>
-        <b>대상</b>: ${r.addr || '(주소 미입력)'}<br>
+        <b>${TYPE_LABEL[r.type]||r.type}</b> · ${sourceBadge} · <span style="color:${STATUS_COLOR[r.status]};font-weight:700;">${STATUS_LABEL[r.status]||r.status}</span><br>
+        <b>대상</b>: ${r.addr || '(주소 미입력)'} ${r.region ? `· ${r.region}` : ''}<br>
         ${coordLine}<br>
         <b>사유</b>: ${(r.reason||'').replace(/</g,'&lt;')}<br>
-        <b>${gpsLine}</b> · ${dist}<br>
+        ${gpsLine || dist ? `<b>${gpsLine}</b> ${gpsLine && dist ? '· ' : ''}${dist}<br>` : ''}
         접수: ${new Date(r.submittedAt).toLocaleString('ko-KR')}
         ${r.resolvedAt ? `<br>처리: ${new Date(r.resolvedAt).toLocaleString('ko-KR')}` : ''}
       </div>
@@ -1767,44 +2068,119 @@ function renderReqCard(r, actionable){
     </div>`;
 }
 
+// 요청/이력 항목의 좌표를 행정구역으로 분류(연월·행정구역 필터에 쓰임). 최초 1회만 계산되고 캐시됨.
+async function classifyRequestRegions(){
+  if(!geocoder) return; // 카카오 로드 전이면 나중에 다시 호출됨(각 render 함수에서 매번 시도)
+  const todo = loadRequests().filter(r=>!r.region && (r.newLat!=null && r.newLng!=null));
+  if(!todo.length) return;
+  for(const r of todo){
+    const region = await coord2RegionName(r.newLat, r.newLng);
+    upsertRequestEntry({ id: r.id, region });
+  }
+}
+
+function monthOf(ts){
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function populateMonthFilter(selectId, list){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const prev = sel.value || 'all';
+  const counts = {};
+  list.forEach(r=>{ const m = monthOf(r.submittedAt); counts[m] = (counts[m]||0)+1; });
+  const opts = [`<option value="all">연월: 전체</option>`];
+  Object.keys(counts).sort().reverse().forEach(m=>{
+    opts.push(`<option value="${m}">${m} (${counts[m]}건)</option>`);
+  });
+  const newHtml = opts.join('');
+  if(sel.innerHTML !== newHtml){
+    sel.innerHTML = newHtml;
+    sel.value = counts[prev] ? prev : 'all';
+  }
+}
+
+function onReqSidoChange(){ document.getElementById('reqSigunguFilter').value='all'; renderRequestsList(); }
+function onHistSidoChange(){ document.getElementById('histSigunguFilter').value='all'; renderHistoryList(); }
+
 function renderRequestsList(){
-  const list = loadRequests().filter(r=>r.status==='pending').sort((a,b)=>b.submittedAt-a.submittedAt);
+  doRenderRequestsList();
+  classifyRequestRegions().then(()=>{
+    if(document.getElementById('panel-requests').classList.contains('active')) doRenderRequestsList();
+  });
+}
+function doRenderRequestsList(){
+  const all = loadRequests();
+  const pending = all.filter(r=>r.status==='pending');
+  populateMonthFilter('reqMonthFilter', pending);
+  populateSidoFilter('reqSidoFilter', pending);
+  populateSigunguFilter('reqSidoFilter', 'reqSigunguFilter', pending);
+
+  const month = document.getElementById('reqMonthFilter').value;
+  const sido = document.getElementById('reqSidoFilter').value;
+  const sigungu = document.getElementById('reqSigunguFilter').value;
+
+  const list = pending.filter(r=>{
+    const matchMonth = month==='all' || monthOf(r.submittedAt)===month;
+    const parts = splitRegion(r.region);
+    const matchSido = sido==='all' || parts.sido===sido;
+    const matchSigungu = sigungu==='all' || parts.sigungu===sigungu;
+    return matchMonth && matchSido && matchSigungu;
+  }).sort((a,b)=>b.submittedAt-a.submittedAt);
+
   const box = document.getElementById('requestsList');
   refreshRequestBadge();
-  if(!list.length){ box.innerHTML = `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">대기 중인 요청이 없습니다.</div>`; return; }
+  if(!list.length){ box.innerHTML = `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">조건에 맞는 대기 중인 요청이 없습니다.</div>`; return; }
   box.innerHTML = list.map(r=>renderReqCard(r, true)).join('');
 }
 
 function renderHistoryList(){
+  doRenderHistoryList();
+  classifyRequestRegions().then(()=>{
+    if(document.getElementById('panel-history').classList.contains('active')) doRenderHistoryList();
+  });
+}
+function doRenderHistoryList(){
+  const all = loadRequests();
+  populateMonthFilter('histMonthFilter', all);
+  populateSidoFilter('histSidoFilter', all);
+  populateSigunguFilter('histSidoFilter', 'histSigunguFilter', all);
+
   const q = (document.getElementById('historySearch')?.value || '').trim().toLowerCase();
-  let list = loadRequests().sort((a,b)=>b.submittedAt-a.submittedAt);
-  if(q) list = list.filter(r => (r.addr||'').toLowerCase().includes(q) || (r.reason||'').toLowerCase().includes(q));
+  const month = document.getElementById('histMonthFilter').value;
+  const sido = document.getElementById('histSidoFilter').value;
+  const sigungu = document.getElementById('histSigunguFilter').value;
+
+  let list = all.filter(r=>{
+    const matchQ = !q || (r.addr||'').toLowerCase().includes(q) || (r.reason||'').toLowerCase().includes(q);
+    const matchMonth = month==='all' || monthOf(r.submittedAt)===month;
+    const parts = splitRegion(r.region);
+    const matchSido = sido==='all' || parts.sido===sido;
+    const matchSigungu = sigungu==='all' || parts.sigungu===sigungu;
+    return matchQ && matchMonth && matchSido && matchSigungu;
+  }).sort((a,b)=>b.submittedAt-a.submittedAt);
+
   const box = document.getElementById('historyList');
   if(!box) return;
   document.getElementById('historyCount').textContent = list.length;
-  if(!list.length){ box.innerHTML = `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">이력이 없습니다.</div>`; return; }
+  if(!list.length){ box.innerHTML = `<div style="text-align:center;color:var(--ink-soft);font-size:13px;padding:20px 0;">조건에 맞는 이력이 없습니다.</div>`; return; }
   box.innerHTML = list.map(r=>renderReqCard(r, false)).join('');
 }
 
+
 function approveRequest(id){
-  const list = loadRequests();
-  const req = list.find(r=>r.id===id);
+  const req = loadRequests().find(r=>r.id===id);
   if(!req) return;
   applyApprovedChange(req);
-  req.status = 'approved';
-  req.resolvedAt = Date.now();
-  saveRequests(list);
+  upsertRequestEntry({ id, status:'approved', resolvedAt: Date.now(), targetId: req.targetId });
   renderRequestsList();
   buildBulkEditTable();
 }
 
 function rejectRequest(id){
-  const list = loadRequests();
-  const req = list.find(r=>r.id===id);
+  const req = loadRequests().find(r=>r.id===id);
   if(!req) return;
-  req.status = 'rejected';
-  req.resolvedAt = Date.now();
-  saveRequests(list);
+  upsertRequestEntry({ id, status:'rejected', resolvedAt: Date.now() });
   renderRequestsList();
 }
 
@@ -1820,6 +2196,7 @@ function addSingle(){
   }
   const rec = {id:newId(), lat, lng, addr, note};
   upsertRecord(rec);
+  logAdminChange('add', rec.id, addr, null, null, lat, lng, '관리자 신규입력');
   addMarkerToMap(rec);
   classifyMissingRegions();
   msg.textContent='등록되었습니다. 지도에 즉시 반영됩니다.'; msg.className='msg ok'; msg.style.display='block';
@@ -1863,6 +2240,7 @@ function parseBulkNew(){
   document.getElementById('confirmBulkBtn').onclick = ()=>{
     parsed.forEach(rec=>{ upsertRecord(rec); addMarkerToMap(rec); });
     classifyMissingRegions();
+    if(parsed.length>0) logAdminChange('add', null, `${parsed.length}건`, null, null, null, null, `관리자 대량입력(붙여넣기) — ${parsed.length}건 등록`);
     msg.textContent = `${parsed.length}건 등록 완료! 지도에 즉시 반영되었습니다.`; msg.className='msg ok';
     document.getElementById('bulkNewArea').value='';
     preview.innerHTML='';
@@ -1944,6 +2322,7 @@ function parseBulkNewExcel(evt){
     document.getElementById('confirmExcelBtn').onclick = ()=>{
       parsed.forEach(rec=>{ upsertRecord(rec); addMarkerToMap(rec); });
       classifyMissingRegions();
+      if(parsed.length>0) logAdminChange('add', null, `${parsed.length}건`, null, null, null, null, `관리자 대량입력(엑셀) — ${parsed.length}건 등록`);
       msg.textContent = `${parsed.length}건 등록 완료! 지도에 즉시 반영되었습니다.`;
       preview.innerHTML=''; evt.target.value='';
       buildBulkEditTable();
@@ -2027,6 +2406,10 @@ function importBulkEditExcel(evt){
     }
     clusterer.redraw();
     if(added>0) classifyMissingRegions();
+    if(added+updated+deleted>0){
+      logAdminChange('edit', null, `신규${added}·수정${updated}·삭제${deleted}`, null, null, null, null,
+        `관리자 통합엑셀(구분열) 업로드 — 신규 ${added}건, 수정 ${updated}건, 삭제 ${deleted}건`);
+    }
     msg.textContent = `신규 ${added}건 · 수정 ${updated}건 · 삭제 ${deleted}건 반영 완료`
       + (notFound? ` · id 불일치(삭제 대상 못 찾음) ${notFound}건`:'')
       + (badCoord? ` · 좌표 오류로 제외 ${badCoord}건`:'');
@@ -2041,35 +2424,78 @@ const BULK_PAGE_SIZE = 100;
 let bulkFilteredList = [];
 let bulkRenderedCount = 0;
 
+// "강원특별자치도 강릉시" 같은 문자열을 {sido:'강원특별자치도', sigungu:'강릉시'}로 분리
+// (내륙 포함 대한민국 어디든 카카오 좌표→행정구역 결과 형식이 동일해서 그대로 적용됨)
+function splitRegion(regionStr){
+  if(!regionStr) return {sido:'', sigungu:''};
+  const parts = regionStr.trim().split(' ');
+  return { sido: parts[0]||'', sigungu: parts.slice(1).join(' ')||'' };
+}
+
 function buildBulkEditTable(){
   const all = loadRecords();
   document.getElementById('totalCount').textContent = all.length;
-  populateBulkRegionFilter(all);
+  populateSidoFilter('bulkSidoFilter', all);
+  populateSigunguFilter('bulkSidoFilter', 'bulkSigunguFilter', all);
   const q = (document.getElementById('bulkEditSearch').value||'').trim().toLowerCase();
-  const region = document.getElementById('bulkEditRegionFilter').value;
+  const sido = document.getElementById('bulkSidoFilter').value;
+  const sigungu = document.getElementById('bulkSigunguFilter').value;
   bulkFilteredList = all.filter(r=>{
     const matchAddr = !q || (r.addr||'').toLowerCase().includes(q);
-    const matchRegion = region==='all' || r.region===region;
-    return matchAddr && matchRegion;
+    const parts = splitRegion(r.region);
+    const matchSido = sido==='all' || parts.sido===sido;
+    const matchSigungu = sigungu==='all' || parts.sigungu===sigungu;
+    return matchAddr && matchSido && matchSigungu;
   });
   bulkRenderedCount = 0;
   document.getElementById('bulkEditBody').innerHTML = '';
   renderMoreBulkRows();
 }
-function populateBulkRegionFilter(all){
-  const sel = document.getElementById('bulkEditRegionFilter');
+
+// 공용: 도/광역시 드롭다운 채우기
+function populateSidoFilter(selectId, all){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
   const prev = sel.value || 'all';
   const counts = {};
-  all.forEach(r=>{ if(r.region) counts[r.region] = (counts[r.region]||0) + 1; });
-  const opts = [`<option value="all">행정구역: 전체 (${all.length}건)</option>`];
-  Object.keys(counts).sort().forEach(region=>{
-    opts.push(`<option value="${region}">${region} (${counts[region]}건)</option>`);
+  all.forEach(r=>{ const {sido} = splitRegion(r.region); if(sido) counts[sido] = (counts[sido]||0)+1; });
+  const opts = [`<option value="all">도/광역시: 전체 (${all.length}건)</option>`];
+  Object.keys(counts).sort().forEach(sido=>{
+    opts.push(`<option value="${sido}">${sido} (${counts[sido]}건)</option>`);
   });
   const newHtml = opts.join('');
-  if(sel.innerHTML !== newHtml){        // 값 유지한 채로 옵션만 갱신(분류 진행 중 계속 늘어남)
+  if(sel.innerHTML !== newHtml){
     sel.innerHTML = newHtml;
     sel.value = counts[prev] || prev==='all' ? prev : 'all';
   }
+}
+// 공용: 선택된 도에 속한 시/군/구만 골라 두 번째 드롭다운 채우기
+function populateSigunguFilter(sidoSelectId, sigunguSelectId, all){
+  const sidoSel = document.getElementById(sidoSelectId);
+  const sel = document.getElementById(sigunguSelectId);
+  if(!sidoSel || !sel) return;
+  const sido = sidoSel.value;
+  const prev = sel.value || 'all';
+  const counts = {};
+  all.forEach(r=>{
+    const parts = splitRegion(r.region);
+    if(!parts.sigungu) return;
+    if(sido!=='all' && parts.sido!==sido) return;
+    counts[parts.sigungu] = (counts[parts.sigungu]||0)+1;
+  });
+  const opts = [`<option value="all">시/군/구: 전체</option>`];
+  Object.keys(counts).sort().forEach(sg=>{
+    opts.push(`<option value="${sg}">${sg} (${counts[sg]}건)</option>`);
+  });
+  const newHtml = opts.join('');
+  if(sel.innerHTML !== newHtml){
+    sel.innerHTML = newHtml;
+    sel.value = counts[prev] ? prev : 'all';
+  }
+}
+function onBulkSidoChange(){
+  document.getElementById('bulkSigunguFilter').value = 'all'; // 도를 바꾸면 시/군 선택 초기화
+  onBulkSearch();
 }
 function onBulkSearch(){ buildBulkEditTable(); }
 
@@ -2097,7 +2523,9 @@ function renderMoreBulkRows(){
 
 function quickDelete(id){
   if(!confirm('이 구조함을 삭제할까요?')) return;
+  const rec = markerObjs[id]?.record || loadRecords().find(r=>r.id===id) || {};
   deleteRecord(id);
+  logAdminChange('delete', id, rec.addr, rec.lat, rec.lng, null, null, '관리자 대량수정에서 삭제');
   if(markerObjs[id]){ clusterer.removeMarker(markerObjs[id].marker); delete markerObjs[id]; }
   buildBulkEditTable();
 }
@@ -2123,7 +2551,10 @@ function saveBulkEdit(){
     updated++;
   });
   clusterer.redraw();
-  if(updated>0) classifyMissingRegions();
+  if(updated>0){
+    classifyMissingRegions();
+    logAdminChange('edit', null, `${updated}건`, null, null, null, null, `관리자 대량수정(표에서 직접 저장) — ${updated}건 변경`);
+  }
   alert(`${updated}건 저장 완료${errors? `, ${errors}건은 좌표 오류로 건너뜀`:''}`);
 }
 </script>
